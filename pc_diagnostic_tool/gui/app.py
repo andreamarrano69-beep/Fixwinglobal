@@ -5,7 +5,7 @@ import datetime
 import queue
 import threading
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 from typing import Callable, Dict, Optional, Set
 
 from core.catalog import default_selected_ids
@@ -69,9 +69,11 @@ class App(tk.Tk):
             btn.pack(fill="x", pady=3)
             self._nav_buttons[key] = btn
 
-        footer = ttk.Frame(sidebar, style="Sidebar.TFrame", padding=(22, 12))
+        footer = ttk.Frame(sidebar, style="Sidebar.TFrame", padding=(12, 12))
         footer.pack(side="bottom", fill="x")
-        ttk.Label(footer, text="v1.1 · Diagnosi e correzione", style="SidebarMuted.TLabel").pack(anchor="w")
+        ttk.Button(footer, text="🚪  Esci dal programma", style="Nav.TButton",
+                   command=self._confirm_exit).pack(fill="x")
+        ttk.Label(footer, text="v1.1 · Diagnosi e correzione", style="SidebarMuted.TLabel").pack(anchor="w", padx=10, pady=(8, 0))
 
         self.content = ttk.Frame(container, style="TFrame")
         self.content.pack(side="left", fill="both", expand=True)
@@ -91,6 +93,10 @@ class App(tk.Tk):
         if hasattr(page, "refresh"):
             page.refresh()
         page.lift()
+
+    def _confirm_exit(self):
+        if messagebox.askyesno("Esci", "Vuoi chiudere PC Diagnostic Tool?"):
+            self.destroy()
 
     # ------------------------------------------------------------------ scan
     def quick_scan(self):
