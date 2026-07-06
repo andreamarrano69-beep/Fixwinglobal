@@ -107,6 +107,21 @@ def apply_theme(root: tk.Tk) -> str:
 
     style.configure("TCheckbutton", background=Palette.panel, foreground=Palette.text,
                      font=(family, 10), focuscolor=Palette.panel)
+
+    style.configure("TNotebook", background=Palette.panel, borderwidth=0, tabmargins=(0, 6, 0, 0))
+    style.configure("TNotebook.Tab", background=Palette.bg_soft, foreground=Palette.text_muted,
+                     padding=(16, 8), font=(family, 10, "bold"), borderwidth=0)
+    style.map("TNotebook.Tab",
+              background=[("selected", Palette.panel)],
+              foreground=[("selected", Palette.text)])
+
+    style.configure("Safe.TButton", background=Palette.success, foreground="#062012",
+                     borderwidth=0, padding=(12, 8), font=(family, 9, "bold"))
+    style.map("Safe.TButton", background=[("active", "#2fd66c"), ("disabled", Palette.text_faint)])
+
+    style.configure("Caution.TButton", background=Palette.warning, foreground="#241300",
+                     borderwidth=0, padding=(12, 8), font=(family, 9, "bold"))
+    style.map("Caution.TButton", background=[("active", "#ffb84d"), ("disabled", Palette.text_faint)])
     style.map("TCheckbutton", background=[("active", Palette.panel)])
 
     style.configure("Horizontal.TProgressbar", background=Palette.accent, troughcolor=Palette.panel_alt,

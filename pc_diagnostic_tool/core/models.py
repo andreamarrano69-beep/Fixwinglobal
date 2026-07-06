@@ -76,4 +76,29 @@ class Category:
     checks: List[CheckMeta]
 
 
+@dataclass
+class Suggestion:
+    """Consiglio testuale (es. upgrade hardware) senza un'azione automatica associata."""
+    icon: str
+    title: str
+    text: str
+
+
+@dataclass
+class FixOutcome:
+    success: bool
+    message: str
+    details: List[str] = field(default_factory=list)
+
+
+@dataclass
+class FixAction:
+    """Azione correttiva proponibile all'utente, con conferma prima dell'esecuzione."""
+    id: str
+    label: str
+    risk: str          # "safe" (reversibile/a basso rischio) oppure "caution" (irreversibile o delicata)
+    description: str   # spiegazione mostrata nella finestra di conferma
+    run: Callable[[], FixOutcome]
+
+
 CheckFunction = Callable[[], CheckResult]

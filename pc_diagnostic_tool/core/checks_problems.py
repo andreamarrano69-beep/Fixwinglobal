@@ -9,6 +9,7 @@ import time
 import psutil
 
 from .models import CheckResult, Status
+from .sensors import read_temperatures
 from .utils import format_bytes, is_linux, is_windows, run_command, run_powershell
 
 
@@ -73,30 +74,24 @@ def check_ram_pressure() -> CheckResult:
 
 
 def check_temp_alert() -> CheckResult:
-    if is_windows():
+    report = read_temperatures()
+    if not report.readings:
         return CheckResult("temp_alert", "Surriscaldamento", Status.UNSUPPORTED,
-                            "Sensori di temperatura non leggibili su Windows senza software dedicato", [])
-    try:
-        temps = psutil.sensors_temperatures()
-    except AttributeError:
-        temps = {}
-    if not temps:
-        return CheckResult("temp_alert", "Surriscaldamento", Status.UNSUPPORTED,
-                            "Nessun sensore di temperatura disponibile", [])
+                            "Nessun sensore di temperatura disponibile",
+                            [report.note] if report.note else [])
     max_temp = 0.0
-    details = []
-    for name, entries in temps.items():
-        for e in entries:
-            max_temp = max(max_temp, e.current)
-            details.append(f"{e.label or name}: {e.current:.0f}°C")
+    details = [f"Fonte dati: {report.source}"]
+    for r in report.readings:
+        max_temp = max(max_temp, r.current)
+        details.append(f"{r.label}: {r.current:.0f}°C")
     if max_temp >= 90:
         return CheckResult("temp_alert", "Surriscaldamento", Status.CRITICAL,
-                            f"Temperatura critica rilevata: {max_temp:.0f}°C", details)
+                            f"Temperatura critica rilevata: {max_temp:.0f}°C", details, raw={"max_temp": max_temp})
     if max_temp >= 80:
         return CheckResult("temp_alert", "Surriscaldamento", Status.WARNING,
-                            f"Temperatura elevata rilevata: {max_temp:.0f}°C", details)
+                            f"Temperatura elevata rilevata: {max_temp:.0f}°C", details, raw={"max_temp": max_temp})
     return CheckResult("temp_alert", "Surriscaldamento", Status.OK,
-                        f"Temperature nella norma (max {max_temp:.0f}°C)", details)
+                        f"Temperature nella norma (max {max_temp:.0f}°C)", details, raw={"max_temp": max_temp})
 
 
 def check_battery_health_alert() -> CheckResult:

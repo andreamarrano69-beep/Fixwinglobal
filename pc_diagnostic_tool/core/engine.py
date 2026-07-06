@@ -47,6 +47,17 @@ CHECK_FUNCTIONS: Dict[str, Callable[[], CheckResult]] = {
 
 
 class DiagnosticEngine:
+    def run_single(self, check_id: str) -> CheckResult:
+        meta = find_check_meta(check_id)
+        func = CHECK_FUNCTIONS.get(check_id)
+        start = time.time()
+        try:
+            result = func() if func else CheckResult(check_id, meta.label, Status.ERROR, "Controllo non implementato")
+        except Exception as exc:  # difesa: un controllo non deve mai far crashare l'app
+            result = CheckResult(check_id, meta.label, Status.ERROR, f"Errore durante l'esecuzione: {exc}")
+        result.duration_ms = (time.time() - start) * 1000
+        return result
+
     def run_checks(
         self,
         selected_ids: List[str],
@@ -61,14 +72,7 @@ class DiagnosticEngine:
             meta = find_check_meta(check_id)
             if on_progress:
                 on_progress(index, total, meta.label)
-            func = CHECK_FUNCTIONS.get(check_id)
-            start = time.time()
-            try:
-                result = func() if func else CheckResult(check_id, meta.label, Status.ERROR, "Controllo non implementato")
-            except Exception as exc:  # difesa: un controllo non deve mai far crashare l'app
-                result = CheckResult(check_id, meta.label, Status.ERROR, f"Errore durante l'esecuzione: {exc}")
-            result.duration_ms = (time.time() - start) * 1000
-            results[check_id] = result
+            results[check_id] = self.run_single(check_id)
         return results
 
     @staticmethod

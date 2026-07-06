@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional, Set
 
 from core.catalog import default_selected_ids
 from core.engine import DiagnosticEngine
-from core.models import CheckResult
+from core.models import CheckResult, FixAction, FixOutcome
 from gui.pages.dashboard import DashboardPage
 from gui.pages.results import ResultsPage
 from gui.pages.selection import SelectionPage
@@ -71,7 +71,7 @@ class App(tk.Tk):
 
         footer = ttk.Frame(sidebar, style="Sidebar.TFrame", padding=(22, 12))
         footer.pack(side="bottom", fill="x")
-        ttk.Label(footer, text="v1.0 · Uso personale", style="SidebarMuted.TLabel").pack(anchor="w")
+        ttk.Label(footer, text="v1.1 · Diagnosi e correzione", style="SidebarMuted.TLabel").pack(anchor="w")
 
         self.content = ttk.Frame(container, style="TFrame")
         self.content.pack(side="left", fill="both", expand=True)
@@ -136,6 +136,40 @@ class App(tk.Tk):
         except queue.Empty:
             pass
         self.after(80, lambda: self._poll_scan_queue(on_row_done, on_progress, on_finished))
+
+    # ------------------------------------------------------------------ async helper
+    def _run_async(self, work: Callable[[], object], on_done: Callable[[object], None]):
+        """Esegue 'work' in un thread separato e richiama 'on_done' sul thread della GUI."""
+        result_queue: "queue.Queue" = queue.Queue()
+
+        def worker():
+            result_queue.put(work())
+
+        threading.Thread(target=worker, daemon=True).start()
+
+        def poll():
+            try:
+                result = result_queue.get_nowait()
+            except queue.Empty:
+                self.after(100, poll)
+                return
+            on_done(result)
+
+        self.after(100, poll)
+
+    # ------------------------------------------------------------------ fix & recheck
+    def run_fix(self, fix: FixAction, on_outcome: Callable[[FixOutcome], None]):
+        self._run_async(fix.run, on_outcome)
+
+    def recheck_single(self, check_id: str, on_done: Callable[[CheckResult], None]):
+        def wrapped(result: CheckResult):
+            self.results[check_id] = result
+            self.last_score = self.engine.compute_health_score(self.results)
+            self.last_scan_time = datetime.datetime.now()
+            self.pages["dashboard"].refresh()
+            on_done(result)
+
+        self._run_async(lambda: self.engine.run_single(check_id), wrapped)
 
 
 def run():

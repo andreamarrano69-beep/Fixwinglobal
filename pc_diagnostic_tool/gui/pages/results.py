@@ -1,13 +1,14 @@
-"""Pagina dei risultati: albero dei controlli eseguiti con dettagli ed esportazione report."""
+"""Pagina dei risultati: albero dei controlli eseguiti, dettagli, consigli, fix ed esportazione report."""
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import filedialog, messagebox, ttk
 
+from core.advisor import get_advisory
 from core.catalog import CATEGORIES
-from core.models import Status
+from core.models import CheckResult, FixAction, FixOutcome, Status
 from gui.theme import Palette
-from gui.widgets import Toast
+from gui.widgets import FixRow, ScrollableFrame, SuggestionCard, Toast
 
 
 class ResultsPage(ttk.Frame):
@@ -53,14 +54,28 @@ class ResultsPage(ttk.Frame):
 
         detail = ttk.Frame(body, style="Panel.TFrame", padding=18)
         detail.pack(side="left", fill="both", expand=True, padx=(16, 0))
-        self.detail_title = ttk.Label(detail, text="Seleziona un controllo per vedere i dettagli",
-                                       style="CardTitle.TLabel", font=(None, 12, "bold"), wraplength=380)
-        self.detail_title.pack(anchor="w", fill="x")
-        self.detail_summary = ttk.Label(detail, text="", style="PanelMuted.TLabel", wraplength=420, justify="left")
-        self.detail_summary.pack(anchor="w", pady=(8, 10))
 
-        text_frame = tk.Frame(detail, bg=Palette.panel)
-        text_frame.pack(fill="both", expand=True)
+        detail_head = ttk.Frame(detail, style="Panel.TFrame")
+        detail_head.pack(fill="x")
+        title_col = ttk.Frame(detail_head, style="Panel.TFrame")
+        title_col.pack(side="left", fill="x", expand=True)
+        self.detail_title = ttk.Label(title_col, text="Seleziona un controllo per vedere i dettagli",
+                                       style="CardTitle.TLabel", font=(None, 12, "bold"), wraplength=300)
+        self.detail_title.pack(anchor="w", fill="x")
+        self.recheck_btn = ttk.Button(detail_head, text="🔄 Ricontrolla", style="TButton",
+                                       command=self._recheck_current, state="disabled")
+        self.recheck_btn.pack(side="right", anchor="n")
+
+        self.detail_summary = ttk.Label(detail, text="", style="PanelMuted.TLabel", wraplength=380, justify="left")
+        self.detail_summary.pack(anchor="w", pady=(8, 10), fill="x")
+
+        self.notebook = ttk.Notebook(detail)
+        self.notebook.pack(fill="both", expand=True)
+
+        details_tab = tk.Frame(self.notebook, bg=Palette.panel)
+        self.notebook.add(details_tab, text="Dettagli")
+        text_frame = tk.Frame(details_tab, bg=Palette.panel)
+        text_frame.pack(fill="both", expand=True, pady=(10, 0))
         self.detail_text = tk.Text(text_frame, bg=Palette.bg_soft, fg=Palette.text, relief="flat",
                                     wrap="word", padx=12, pady=10, font=(None, 10), state="disabled",
                                     insertbackground=Palette.text)
@@ -69,11 +84,20 @@ class ResultsPage(ttk.Frame):
         self.detail_text.pack(side="left", fill="both", expand=True)
         detail_vbar.pack(side="right", fill="y")
 
-        self._result_by_iid = {}
+        advisory_tab = ttk.Frame(self.notebook, style="Panel.TFrame")
+        self.notebook.add(advisory_tab, text="Consigli e fix")
+        self.advisory_scroll = ScrollableFrame(advisory_tab, bg=Palette.panel)
+        self.advisory_scroll.pack(fill="both", expand=True, pady=(10, 0))
 
+        self._result_by_iid = {}
+        self._iid_by_check_id = {}
+        self._current_check_id = None
+
+    # ------------------------------------------------------------------ popolamento albero
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
         self._result_by_iid.clear()
+        self._iid_by_check_id.clear()
         results = self.app.results
 
         if not results:
@@ -95,7 +119,16 @@ class ResultsPage(ttk.Frame):
                                         values=(f"{result.status.icon} {result.status.label}",),
                                         tags=(result.status.value,))
                 self._result_by_iid[iid] = result
+                self._iid_by_check_id[result.check_id] = iid
 
+    def _update_tree_item(self, result: CheckResult):
+        iid = self._iid_by_check_id.get(result.check_id)
+        if not iid:
+            return
+        self.tree.item(iid, values=(f"{result.status.icon} {result.status.label}",), tags=(result.status.value,))
+        self._result_by_iid[iid] = result
+
+    # ------------------------------------------------------------------ selezione e dettagli
     def _on_select(self, _event):
         selection = self.tree.selection()
         if not selection:
@@ -103,13 +136,81 @@ class ResultsPage(ttk.Frame):
         result = self._result_by_iid.get(selection[0])
         if not result:
             return
+        self._show_result(result)
+
+    def _show_result(self, result: CheckResult):
+        self._current_check_id = result.check_id
+        self.recheck_btn.configure(state="normal")
         self.detail_title.configure(text=result.title)
         self.detail_summary.configure(text=f"{result.status.icon} {result.summary}")
         self.detail_text.configure(state="normal")
         self.detail_text.delete("1.0", "end")
         self.detail_text.insert("end", "\n".join(result.details) if result.details else "Nessun dettaglio aggiuntivo.")
         self.detail_text.configure(state="disabled")
+        self._render_advisory(result)
 
+    def _render_advisory(self, result: CheckResult):
+        for widget in self.advisory_scroll.inner.winfo_children():
+            widget.destroy()
+
+        suggestions, fixes = get_advisory(result)
+        content = self.advisory_scroll.inner
+
+        if not suggestions and not fixes:
+            ttk.Label(content, text="Nessun suggerimento per questo controllo: risulta a posto.",
+                      style="PanelMuted.TLabel", wraplength=380, justify="left").pack(anchor="w", pady=10, padx=4)
+            return
+
+        if suggestions:
+            ttk.Label(content, text="💡 Suggerimenti", style="Title.TLabel",
+                      font=(None, 11, "bold")).pack(anchor="w", pady=(4, 8))
+            for s in suggestions:
+                SuggestionCard(content, s.icon, s.title, s.text).pack(fill="x", pady=4)
+
+        if fixes:
+            ttk.Label(content, text="🔧 Correzioni disponibili", style="Title.TLabel",
+                      font=(None, 11, "bold")).pack(anchor="w", pady=(16, 8))
+            for fix in fixes:
+                row = FixRow(content, fix.label, fix.risk, fix.description,
+                             on_apply=lambda _row, f=fix: self._confirm_and_apply(f, _row))
+                row.pack(fill="x", pady=4)
+
+    # ------------------------------------------------------------------ fix
+    def _confirm_and_apply(self, fix: FixAction, row: FixRow):
+        warning = "\n\n⚠ Questa operazione potrebbe non essere reversibile." if fix.risk == "caution" else ""
+        confirmed = messagebox.askyesno(
+            "Conferma correzione",
+            f"{fix.label}\n\n{fix.description}{warning}\n\nProcedere?",
+            icon="warning" if fix.risk == "caution" else "question",
+        )
+        if not confirmed:
+            return
+        row.set_busy()
+
+        def on_outcome(outcome: FixOutcome):
+            row.set_result(outcome.success, outcome.message)
+            Toast(self.app, outcome.message, kind="success" if outcome.success else "error")
+            if self._current_check_id:
+                self.app.recheck_single(self._current_check_id, self._on_recheck_done)
+
+        self.app.run_fix(fix, on_outcome)
+
+    def _recheck_current(self):
+        if not self._current_check_id:
+            return
+        self.recheck_btn.configure(state="disabled", text="Verifica in corso...")
+        self.app.recheck_single(self._current_check_id, self._on_recheck_done)
+
+    def _on_recheck_done(self, result: CheckResult):
+        self.recheck_btn.configure(state="normal", text="🔄 Ricontrolla")
+        self._update_tree_item(result)
+        self.subtitle.configure(
+            text=f"Ultima scansione: {self.app.last_scan_time.strftime('%d/%m/%Y %H:%M')} · "
+                 f"Punteggio di salute: {self.app.last_score}/100")
+        if self._current_check_id == result.check_id:
+            self._show_result(result)
+
+    # ------------------------------------------------------------------ esportazione
     def _export(self, fmt: str):
         if not self.app.results:
             Toast(self.app, "Esegui prima una scansione", kind="warning")

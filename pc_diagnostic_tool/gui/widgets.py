@@ -183,3 +183,54 @@ class Toast(tk.Frame):
         tk.Label(self, text=message, bg=color, fg="#0b1220", font=(None, 10, "bold")).pack()
         self.place(relx=0.5, rely=0.96, anchor="s")
         self.after(duration_ms, self.destroy)
+
+
+class SuggestionCard(ttk.Frame):
+    """Card che mostra un singolo consiglio (es. upgrade hardware)."""
+
+    def __init__(self, parent, icon: str, title: str, text: str, **kwargs):
+        super().__init__(parent, style="PanelAlt.TFrame", padding=(14, 12), **kwargs)
+        head = ttk.Frame(self, style="PanelAlt.TFrame")
+        head.pack(fill="x", anchor="w")
+        ttk.Label(head, text=icon, background=Palette.panel_alt, foreground=Palette.text,
+                  font=(None, 13)).pack(side="left")
+        ttk.Label(head, text=title, background=Palette.panel_alt, foreground=Palette.text,
+                  font=(None, 10, "bold")).pack(side="left", padx=(8, 0))
+        ttk.Label(self, text=text, background=Palette.panel_alt, foreground=Palette.text_muted,
+                  wraplength=290, justify="left", font=(None, 9)).pack(anchor="w", pady=(6, 0), fill="x")
+
+
+class FixRow(ttk.Frame):
+    """Riga con un'azione di fix proponibile: etichetta, rischio, pulsante 'Applica' e stato esito."""
+
+    def __init__(self, parent, label: str, risk: str, description: str,
+                 on_apply: Callable[["FixRow"], None], **kwargs):
+        super().__init__(parent, style="PanelAlt.TFrame", padding=(14, 12), **kwargs)
+        self.on_apply = on_apply
+
+        ttk.Label(self, text=label, background=Palette.panel_alt, foreground=Palette.text,
+                  font=(None, 10, "bold"), wraplength=290, justify="left").pack(anchor="w", fill="x")
+        risk_text = "rischio: sicuro" if risk == "safe" else "rischio: attenzione"
+        risk_color = Palette.success if risk == "safe" else Palette.warning
+        ttk.Label(self, text=risk_text, background=Palette.panel_alt, foreground=risk_color,
+                  font=(None, 8, "bold")).pack(anchor="w", pady=(2, 0))
+
+        ttk.Label(self, text=description, background=Palette.panel_alt, foreground=Palette.text_muted,
+                  wraplength=290, justify="left", font=(None, 9)).pack(anchor="w", pady=(6, 8), fill="x")
+
+        bottom = ttk.Frame(self, style="PanelAlt.TFrame")
+        bottom.pack(fill="x")
+        self.apply_btn = ttk.Button(bottom, text="Applica", style="Safe.TButton" if risk == "safe" else "Caution.TButton",
+                                     command=lambda: self.on_apply(self))
+        self.apply_btn.pack(side="left")
+        self.status_label = ttk.Label(bottom, text="", background=Palette.panel_alt, foreground=Palette.text_muted,
+                                       font=(None, 9))
+        self.status_label.pack(side="left", padx=(10, 0))
+
+    def set_busy(self, message: str = "Applicazione in corso..."):
+        self.apply_btn.configure(state="disabled")
+        self.status_label.configure(text=message, foreground=Palette.info)
+
+    def set_result(self, success: bool, message: str):
+        self.apply_btn.configure(state="normal")
+        self.status_label.configure(text=message, foreground=Palette.success if success else Palette.critical)

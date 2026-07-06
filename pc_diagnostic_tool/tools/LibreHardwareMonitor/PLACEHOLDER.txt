@@ -1,0 +1,8 @@
+Metti qui LibreHardwareMonitor.exe (scaricato da
+https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases)
+per abilitare la lettura delle temperature reali su Windows.
+
+Il file finale deve trovarsi in:
+  tools/LibreHardwareMonitor/LibreHardwareMonitor.exe
+
+Vedi il README principale del progetto per i dettagli.

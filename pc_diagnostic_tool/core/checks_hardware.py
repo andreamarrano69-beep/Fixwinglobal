@@ -7,6 +7,7 @@ import socket
 import psutil
 
 from .models import CheckResult, Status
+from .sensors import read_temperatures
 from .utils import format_bytes, format_seconds, is_linux, is_mac, is_windows, run_command, run_powershell
 
 
@@ -275,25 +276,17 @@ def check_battery() -> CheckResult:
 
 
 def check_temperature() -> CheckResult:
-    if is_windows():
+    report = read_temperatures()
+    if not report.readings:
         return CheckResult("temperature", "Sensori di temperatura", Status.UNSUPPORTED,
-                            "Windows non espone i sensori di temperatura senza software dedicato",
-                            ["Suggerimento: installa 'Open Hardware Monitor' o 'HWiNFO' per leggere le temperature."])
-    try:
-        temps = psutil.sensors_temperatures()
-    except AttributeError:
-        temps = {}
-    if not temps:
-        return CheckResult("temperature", "Sensori di temperatura", Status.UNSUPPORTED,
-                            "Nessun sensore di temperatura rilevato su questo sistema", [])
+                            "Nessun sensore di temperatura rilevato su questo sistema",
+                            [report.note] if report.note else [])
 
-    details = []
+    details = [f"Fonte dati: {report.source}"]
     max_temp = 0.0
-    for name, entries in temps.items():
-        for e in entries:
-            label = e.label or name
-            details.append(f"{label}: {e.current:.0f}°C" + (f" (max {e.high:.0f}°C)" if e.high else ""))
-            max_temp = max(max_temp, e.current)
+    for r in report.readings:
+        details.append(f"{r.label}: {r.current:.0f}°C" + (f" (max {r.high:.0f}°C)" if r.high else ""))
+        max_temp = max(max_temp, r.current)
 
     if max_temp >= 90:
         status, summary = Status.CRITICAL, f"Temperatura molto elevata rilevata: {max_temp:.0f}°C"
