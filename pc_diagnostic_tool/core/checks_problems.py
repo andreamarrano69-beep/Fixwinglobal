@@ -1,6 +1,7 @@
 """Controlli euristici per l'individuazione di problemi potenziali del sistema."""
 from __future__ import annotations
 
+import os
 import re
 import socket
 import tempfile
@@ -10,7 +11,7 @@ import psutil
 
 from .models import CheckResult, Status
 from .sensors import read_temperatures
-from .utils import format_bytes, is_linux, is_windows, run_command, run_powershell
+from .utils import format_bytes, is_linux, is_windows, run_command, run_powershell, sample_processes
 
 
 def check_disk_space_alert() -> CheckResult:
@@ -42,13 +43,9 @@ def check_disk_space_alert() -> CheckResult:
 def check_cpu_load_alert() -> CheckResult:
     percent = psutil.cpu_percent(interval=1.0)
     details = [f"Utilizzo CPU misurato: {percent:.0f}% (campione istantaneo)"]
-    top = sorted(
-        psutil.process_iter(["name", "cpu_percent"]),
-        key=lambda p: p.info.get("cpu_percent") or 0,
-        reverse=True,
-    )[:5]
+    top = sorted(sample_processes(), key=lambda i: i.get("cpu_percent") or 0, reverse=True)[:5]
     for p in top:
-        details.append(f"  {p.info['name']}: {p.info.get('cpu_percent') or 0:.1f}%")
+        details.append(f"  {p['name']}: {p.get('cpu_percent') or 0:.1f}%")
 
     if percent >= 90:
         return CheckResult("cpu_load_alert", "Sovraccarico CPU", Status.CRITICAL,
@@ -96,9 +93,10 @@ def check_temp_alert() -> CheckResult:
 
 def check_battery_health_alert() -> CheckResult:
     if is_windows():
-        report_path = tempfile.mktemp(suffix=".xml")
-        run_powershell(f'powercfg /batteryreport /XML /output "{report_path}"', timeout=20)
+        fd, report_path = tempfile.mkstemp(suffix=".xml")
+        os.close(fd)
         try:
+            run_powershell(f'powercfg /batteryreport /XML /output "{report_path}"', timeout=20)
             with open(report_path, encoding="utf-8", errors="ignore") as f:
                 xml = f.read()
             design = re.search(r"<DesignCapacity>(\d+)</DesignCapacity>", xml)
@@ -121,6 +119,11 @@ def check_battery_health_alert() -> CheckResult:
                                     f"Salute batteria buona: {ratio:.0f}% della capacità originale", details)
         except OSError:
             pass
+        finally:
+            try:
+                os.remove(report_path)
+            except OSError:
+                pass
     battery = psutil.sensors_battery()
     if battery is None:
         return CheckResult("battery_health_alert", "Batteria degradata", Status.UNSUPPORTED,

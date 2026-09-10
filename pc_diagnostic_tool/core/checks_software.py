@@ -8,7 +8,7 @@ import time
 import psutil
 
 from .models import CheckResult, Status
-from .utils import format_seconds, is_linux, is_mac, is_windows, run_command, run_powershell
+from .utils import format_seconds, is_linux, is_mac, is_windows, run_command, run_powershell, sample_processes
 
 
 def check_os_info() -> CheckResult:
@@ -110,12 +110,7 @@ def check_startup_programs() -> CheckResult:
 
 
 def check_running_processes() -> CheckResult:
-    procs = []
-    for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent"]):
-        try:
-            procs.append(p.info)
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            continue
+    procs = sample_processes()
 
     by_cpu = sorted(procs, key=lambda i: i.get("cpu_percent") or 0, reverse=True)[:8]
     by_mem = sorted(procs, key=lambda i: i.get("memory_percent") or 0, reverse=True)[:8]
