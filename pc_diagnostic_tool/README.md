@@ -64,6 +64,11 @@ pip install -r requirements.txt
 python main.py
 ```
 
+**Su Windows** puoi anche fare doppio clic su `avvia.bat`: installa da solo le
+dipendenze (solo la prima volta) e apre il programma, senza dover usare il
+terminale. Richiede comunque Python installato (da python.org, spuntando
+"Add python.exe to PATH" durante l'installazione).
+
 Su Windows, per i controlli più completi (salute dischi, driver, aggiornamenti,
 antivirus) è consigliato eseguire il programma come **amministratore**.
 

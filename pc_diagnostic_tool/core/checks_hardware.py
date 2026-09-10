@@ -68,6 +68,46 @@ def platform_cpu_name() -> str:
     return _platform.processor() or _platform.machine()
 
 
+def _ram_slot_info() -> list:
+    """Interroga WMI per capire quanti banchi RAM sono occupati/liberi (utile per consigli di upgrade)."""
+    if not is_windows():
+        return []
+    script = (
+        "$sticks = Get-CimInstance Win32_PhysicalMemory | "
+        "Select-Object Capacity,Speed,Manufacturer,MemoryType; "
+        "$slots = (Get-CimInstance Win32_PhysicalMemoryArray).MemoryDevices; "
+        "Write-Output \"SLOTS_TOTALI:$slots\"; "
+        "$sticks | ForEach-Object { Write-Output \"BANCO:$($_.Capacity)|$($_.Speed)|$($_.Manufacturer)\" }"
+    )
+    out = run_powershell(script, timeout=10)
+    if not out:
+        return []
+    details = []
+    occupied = 0
+    total_slots = None
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith("SLOTS_TOTALI:"):
+            try:
+                total_slots = int(line.split(":", 1)[1])
+            except ValueError:
+                pass
+        elif line.startswith("BANCO:"):
+            occupied += 1
+            parts = line.split(":", 1)[1].split("|")
+            if len(parts) == 3:
+                capacity, speed, manufacturer = parts
+                try:
+                    cap_str = format_bytes(int(capacity))
+                except ValueError:
+                    cap_str = "?"
+                details.append(f"  Banco: {cap_str} a {speed} MHz ({manufacturer.strip() or 'produttore sconosciuto'})")
+    if total_slots is not None:
+        free = max(total_slots - occupied, 0)
+        details.insert(0, f"Slot RAM: {occupied} occupati su {total_slots} totali ({free} liberi)")
+    return details
+
+
 def check_ram() -> CheckResult:
     vm = psutil.virtual_memory()
     swap = psutil.swap_memory()
@@ -78,6 +118,7 @@ def check_ram() -> CheckResult:
         f"Swap: {format_bytes(swap.used)} / {format_bytes(swap.total)} usata"
         if swap.total else "Swap: non configurata",
     ]
+    details.extend(_ram_slot_info())
     if vm.percent >= 90:
         status, summary = Status.CRITICAL, f"Memoria quasi esaurita: {vm.percent:.0f}% in uso"
     elif vm.percent >= 75:
@@ -129,18 +170,22 @@ def check_disk_health() -> CheckResult:
     details = []
     if is_windows():
         out = run_powershell(
-            "Get-PhysicalDisk | Select-Object FriendlyName,HealthStatus,OperationalStatus | Format-List"
+            "Get-PhysicalDisk | Select-Object FriendlyName,HealthStatus,OperationalStatus,MediaType,BusType,Size | Format-List"
         )
         if out and out.strip():
             entries = [e.strip() for e in out.split("\n\n") if e.strip()]
             bad = False
+            has_hdd = False
             for entry in entries:
                 details.append(entry.replace("\n", " | "))
                 if "healthy" not in entry.lower() and "sano" not in entry.lower():
                     bad = True
+                if "hdd" in entry.lower():
+                    has_hdd = True
             status = Status.CRITICAL if bad else Status.OK
             summary = "Problema rilevato sullo stato di uno o più dischi" if bad else "Tutti i dischi risultano in stato integro"
-            return CheckResult("disk_health", "Salute dischi (SMART)", status, summary, details)
+            return CheckResult("disk_health", "Salute dischi (SMART)", status, summary, details,
+                                raw={"has_hdd": has_hdd})
         return CheckResult("disk_health", "Salute dischi (SMART)", Status.INFO,
                             "Impossibile leggere lo stato SMART (permessi insufficienti o comando non disponibile)",
                             ["Suggerimento: eseguire il programma come amministratore."])

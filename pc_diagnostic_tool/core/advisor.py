@@ -155,11 +155,12 @@ def advise_disk_health(result: CheckResult) -> Tuple[List[Suggestion], List[FixA
 def advise_disk_fragmentation(result: CheckResult) -> Tuple[List[Suggestion], List[FixAction]]:
     suggestions, fixes = [], []
     if is_windows():
-        suggestions.append(Suggestion(
-            "🛒", "Considera un SSD",
-            "Se il disco principale è ancora un HDD meccanico, sostituirlo con un SSD è l'aggiornamento "
-            "hardware con il maggior impatto percepito sulla velocità generale del PC (avvio, apertura "
-            "programmi, copia file)."))
+        if result.raw.get("has_hdd"):
+            suggestions.append(Suggestion(
+                "🛒", "Sostituisci l'HDD con un SSD",
+                "È stato rilevato un disco meccanico (HDD): sostituirlo con un SSD è l'aggiornamento "
+                "hardware con il maggior impatto percepito sulla velocità generale del PC (avvio, apertura "
+                "programmi, copia file)."))
         for part in psutil.disk_partitions(all=False):
             letter = part.mountpoint.rstrip("\\").rstrip(":")
             if letter and len(letter) <= 2:

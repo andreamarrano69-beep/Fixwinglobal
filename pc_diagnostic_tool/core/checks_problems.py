@@ -209,9 +209,17 @@ def check_disk_fragmentation() -> CheckResult:
     out = run_powershell(
         "Get-Volume | Where-Object {$_.DriveType -eq 'Fixed'} | Select-Object DriveLetter,FileSystemType | Format-Table -AutoSize | Out-String"
     )
-    return CheckResult("disk_fragmentation", "Frammentazione disco", Status.INFO,
-                        "Per un'analisi completa esegui 'Deframmenta e ottimizza unità' inclusa in Windows",
-                        [l.rstrip() for l in (out or "").splitlines() if l.strip()])
+    media_out = run_powershell("(Get-PhysicalDisk | Select-Object -ExpandProperty MediaType) -join ','")
+    has_hdd = bool(media_out and "hdd" in media_out.lower())
+    details = [l.rstrip() for l in (out or "").splitlines() if l.strip()]
+    if has_hdd:
+        status = Status.WARNING
+        summary = "Rilevato almeno un disco meccanico (HDD): la frammentazione ne riduce le prestazioni nel tempo"
+    else:
+        status = Status.OK
+        summary = "Nessun disco meccanico rilevato (SSD/NVMe): la frammentazione non è un problema rilevante"
+    return CheckResult("disk_fragmentation", "Frammentazione disco", status, summary, details,
+                        raw={"has_hdd": has_hdd})
 
 
 def check_network_connectivity() -> CheckResult:
