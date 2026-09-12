@@ -7,10 +7,10 @@ selezionabili singolarmente.
 ## Funzionalità
 
 - **Dashboard** con punteggio di salute (0-100), card riepilogative e avvio rapido.
-- **Selezione controlli**: 28 verifiche suddivise in 3 categorie, ognuna attivabile/disattivabile:
-  - **Hardware**: CPU, RAM, dischi, salute SMART, GPU, scheda madre/BIOS, rete, batteria, temperature, USB.
-  - **Software**: sistema operativo, aggiornamenti, software installato, programmi all'avvio, processi, antivirus, driver, servizi.
-  - **Problemi potenziali**: spazio disco, sovraccarico CPU, memoria insufficiente, surriscaldamento, batteria degradata, errori di sistema, processi sospetti, riavvio in sospeso, frammentazione, connettività.
+- **Selezione controlli**: 31 verifiche suddivise in 3 categorie, ognuna attivabile/disattivabile:
+  - **Hardware**: CPU, RAM (con conteggio slot occupati/liberi), dischi, salute SMART (tipo SSD/HDD), GPU, scheda madre/BIOS, rete, batteria, temperature, USB, **monitoraggio prestazioni** (campiona CPU/RAM/disco per ~8 secondi per scovare picchi intermittenti), **test velocità disco reale** (scrive/legge un file da 100 MB).
+  - **Software**: sistema operativo (produttore, modello, numero di serie, edizione Windows esatta), aggiornamenti, software installato, programmi all'avvio, processi, antivirus, driver, servizi.
+  - **Problemi potenziali**: spazio disco, sovraccarico CPU, memoria insufficiente, surriscaldamento, batteria degradata, errori di sistema, processi sospetti, riavvio in sospeso, frammentazione, connettività, **cronologia affidabilità di Windows** (crash/blocchi registrati dal sistema).
 - **Risultati** in un elenco ad albero colorato per gravità (OK / Attenzione / Critico / Non disponibile), con pannello dettagli a due schede:
   - **Dettagli**: dati tecnici grezzi del controllo.
   - **Consigli e fix**: suggerimenti testuali (anche di upgrade hardware, es. "aumenta la RAM", "sostituisci l'HDD con un SSD", "pulisci il dissipatore") e, dove possibile, **azioni di correzione applicabili con un click** ("Applica"), sempre con conferma esplicita prima dell'esecuzione.

@@ -1,8 +1,11 @@
 """Controlli hardware: CPU, RAM, dischi, GPU, scheda madre, rete, batteria, temperature, USB."""
 from __future__ import annotations
 
+import os
 import re
 import socket
+import tempfile
+import time
 
 import psutil
 
@@ -365,3 +368,115 @@ def check_usb() -> CheckResult:
 
     return CheckResult("usb", "Dispositivi USB collegati", Status.INFO,
                         "Impossibile enumerare i dispositivi USB su questo sistema", [])
+
+
+def check_performance_monitor() -> CheckResult:
+    """Campiona CPU/RAM/I-O disco per alcuni secondi, invece di un solo istante, per scovare picchi intermittenti."""
+    duration_s = 8
+    cpu_samples = []
+    ram_samples = []
+    io_before = None
+    try:
+        io_before = psutil.disk_io_counters()
+    except (OSError, RuntimeError):
+        pass
+
+    t_start = time.time()
+    while time.time() - t_start < duration_s:
+        cpu_samples.append(psutil.cpu_percent(interval=1.0))
+        ram_samples.append(psutil.virtual_memory().percent)
+    elapsed = time.time() - t_start
+
+    io_after = None
+    try:
+        io_after = psutil.disk_io_counters()
+    except (OSError, RuntimeError):
+        pass
+
+    cpu_avg = sum(cpu_samples) / len(cpu_samples)
+    cpu_max = max(cpu_samples)
+    ram_avg = sum(ram_samples) / len(ram_samples)
+    ram_max = max(ram_samples)
+
+    details = [
+        f"Durata campionamento: {elapsed:.0f} secondi ({len(cpu_samples)} letture)",
+        f"CPU: media {cpu_avg:.0f}%, picco massimo {cpu_max:.0f}%",
+        f"RAM: media {ram_avg:.0f}%, picco massimo {ram_max:.0f}%",
+    ]
+    if io_before and io_after:
+        read_mb = (io_after.read_bytes - io_before.read_bytes) / (1024 * 1024)
+        write_mb = (io_after.write_bytes - io_before.write_bytes) / (1024 * 1024)
+        details.append(f"Disco: {read_mb:.1f} MB letti, {write_mb:.1f} MB scritti durante il campionamento")
+
+    if cpu_max >= 95 and cpu_avg < 50:
+        status = Status.WARNING
+        summary = f"Rilevato un picco intermittente di CPU al {cpu_max:.0f}% (media {cpu_avg:.0f}%)"
+    elif cpu_avg >= 80:
+        status = Status.WARNING
+        summary = f"CPU costantemente sotto carico elevato durante il campionamento (media {cpu_avg:.0f}%)"
+    else:
+        status = Status.OK
+        summary = f"Nessun picco anomalo rilevato (CPU media {cpu_avg:.0f}%, picco {cpu_max:.0f}%)"
+
+    return CheckResult("performance_monitor", "Monitoraggio prestazioni", status, summary, details,
+                        raw={"cpu_avg": cpu_avg, "cpu_max": cpu_max})
+
+
+def check_disk_speed_test() -> CheckResult:
+    """Test pratico: scrive e rilegge un file da 100 MB per misurare la velocità reale del disco."""
+    test_size_mb = 100
+    chunk = os.urandom(1024 * 1024)  # 1 MB casuale (non comprimibile), riscritto 100 volte
+    tmp_dir = tempfile.gettempdir()
+
+    try:
+        fd, path = tempfile.mkstemp(suffix=".diskbench", dir=tmp_dir)
+        os.close(fd)
+    except OSError as exc:
+        return CheckResult("disk_speed_test", "Test velocità disco", Status.ERROR,
+                            f"Impossibile creare il file di test: {exc}", [])
+
+    try:
+        start = time.time()
+        with open(path, "wb") as f:
+            for _ in range(test_size_mb):
+                f.write(chunk)
+            f.flush()
+            os.fsync(f.fileno())
+        write_time = time.time() - start
+        write_speed = test_size_mb / write_time if write_time > 0 else 0.0
+
+        start = time.time()
+        with open(path, "rb") as f:
+            while f.read(4 * 1024 * 1024):
+                pass
+        read_time = time.time() - start
+        read_speed = test_size_mb / read_time if read_time > 0 else 0.0
+    except OSError as exc:
+        return CheckResult("disk_speed_test", "Test velocità disco", Status.ERROR,
+                            f"Impossibile completare il test: {exc}", [])
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+    details = [
+        f"Cartella di test: {tmp_dir}",
+        f"Dimensione file di test: {test_size_mb} MB",
+        f"Velocità di scrittura: {write_speed:.0f} MB/s",
+        f"Velocità di lettura: {read_speed:.0f} MB/s (può risultare più alta del reale per via della "
+        "cache del sistema operativo)",
+    ]
+
+    if write_speed < 60:
+        status = Status.CRITICAL
+        summary = f"Disco molto lento in scrittura: {write_speed:.0f} MB/s (tipico di un HDD datato o quasi pieno)"
+    elif write_speed < 150:
+        status = Status.WARNING
+        summary = f"Velocità in scrittura da disco meccanico (HDD): {write_speed:.0f} MB/s"
+    else:
+        status = Status.OK
+        summary = f"Velocità in scrittura buona: {write_speed:.0f} MB/s (compatibile con un SSD)"
+
+    return CheckResult("disk_speed_test", "Test velocità disco", status, summary, details,
+                        raw={"write_speed": write_speed, "read_speed": read_speed})

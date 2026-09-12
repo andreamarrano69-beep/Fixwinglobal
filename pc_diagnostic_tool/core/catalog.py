@@ -21,6 +21,12 @@ CATEGORIES: List[Category] = [
             CheckMeta("battery", "Batteria", "Percentuale di carica e stato di alimentazione (portatili)"),
             CheckMeta("temperature", "Sensori di temperatura", "Temperature rilevate su CPU e altri sensori"),
             CheckMeta("usb", "Dispositivi USB collegati", "Elenco delle periferiche USB attualmente connesse"),
+            CheckMeta("performance_monitor", "Monitoraggio prestazioni (~8 sec)",
+                      "Campiona CPU, RAM e attività disco per alcuni secondi per rilevare picchi intermittenti "
+                      "che un singolo controllo istantaneo non vedrebbe"),
+            CheckMeta("disk_speed_test", "Test velocità disco (scrive/legge un file da 100 MB)",
+                      "Misura la velocità reale di scrittura/lettura del disco per capire se è il collo di "
+                      "bottiglia delle prestazioni (non solo quanto spazio è occupato)", default_selected=False),
         ],
     ),
     Category(
@@ -28,7 +34,8 @@ CATEGORIES: List[Category] = [
         label="Software",
         icon="💽",
         checks=[
-            CheckMeta("os_info", "Sistema operativo", "Versione, build, architettura e tempo di attività"),
+            CheckMeta("os_info", "Sistema operativo",
+                      "Produttore, modello, numero di serie, edizione/build di Windows e tempo di attività"),
             CheckMeta("windows_update", "Aggiornamenti di sistema", "Stato degli aggiornamenti installati/in sospeso"),
             CheckMeta("installed_apps", "Software installato", "Elenco dei programmi installati sul sistema"),
             CheckMeta("startup_programs", "Programmi all'avvio", "Applicazioni che si avviano insieme al PC"),
@@ -53,6 +60,8 @@ CATEGORIES: List[Category] = [
             CheckMeta("pending_reboot", "Riavvio in sospeso", "Verifica se il sistema richiede un riavvio"),
             CheckMeta("disk_fragmentation", "Frammentazione disco", "Stima la frammentazione sui dischi meccanici (HDD)"),
             CheckMeta("network_connectivity", "Connettività di rete", "Verifica la raggiungibilità di Internet e la latenza"),
+            CheckMeta("reliability_history", "Cronologia affidabilità Windows",
+                      "Legge gli eventi critici (crash, blocchi, arresti anomali) registrati da Windows stesso"),
         ],
     ),
 ]

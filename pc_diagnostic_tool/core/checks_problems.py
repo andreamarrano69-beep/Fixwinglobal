@@ -260,3 +260,33 @@ def check_network_connectivity() -> CheckResult:
                             f"Connessione funzionante ma con latenza elevata ({best_latency:.0f} ms)", details)
     return CheckResult("network_connectivity", "Connettività di rete", Status.OK,
                         f"Connessione a Internet funzionante ({best_latency:.0f} ms)", details)
+
+
+def check_reliability_history() -> CheckResult:
+    """Legge la Cronologia affidabilità di Windows: crash, blocchi e arresti anomali registrati dal sistema."""
+    if not is_windows():
+        return CheckResult("reliability_history", "Cronologia affidabilità Windows", Status.UNSUPPORTED,
+                            "Disponibile solo su Windows", [])
+    script = (
+        "Get-CimInstance Win32_ReliabilityRecords -ErrorAction SilentlyContinue | "
+        "Sort-Object -Property TimeGenerated -Descending | Select-Object -First 15 "
+        "TimeGenerated,SourceName,Message | Format-Table -AutoSize -Wrap | Out-String -Width 300"
+    )
+    out = run_powershell(script, timeout=15)
+    if not out or not out.strip():
+        return CheckResult("reliability_history", "Cronologia affidabilità Windows", Status.INFO,
+                            "Impossibile leggere la cronologia affidabilità (potrebbe richiedere permessi "
+                            "di amministratore o non essere disponibile su questo sistema)", [])
+    lines = [l.rstrip() for l in out.splitlines() if l.strip()]
+    count = max(len(lines) - 2, 0)
+    if count > 6:
+        status = Status.CRITICAL
+        summary = f"{count} eventi critici registrati di recente: il sistema si blocca/va in crash spesso"
+    elif count > 0:
+        status = Status.WARNING
+        summary = f"{count} eventi critici registrati di recente da Windows"
+    else:
+        status = Status.OK
+        summary = "Nessun evento critico recente nella cronologia affidabilità"
+    return CheckResult("reliability_history", "Cronologia affidabilità Windows", status, summary, lines,
+                        raw={"count": count})

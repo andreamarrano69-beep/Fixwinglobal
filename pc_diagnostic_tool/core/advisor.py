@@ -292,6 +292,50 @@ def advise_drivers(result: CheckResult) -> Tuple[List[Suggestion], List[FixActio
     return [], fixes
 
 
+def advise_performance_monitor(result: CheckResult) -> Tuple[List[Suggestion], List[FixAction]]:
+    suggestions, fixes = [], []
+    if result.status in PROBLEM_STATUSES:
+        suggestions.append(Suggestion(
+            "📈", "Individua il processo responsabile del picco",
+            "È stato rilevato un carico anomalo durante il monitoraggio prolungato. Apri Gestione attività "
+            "e osserva la CPU per qualche minuto per individuare quale programma causa il picco: spesso è "
+            "un aggiornamento in background, un antivirus in scansione o un processo bloccato."))
+        fixes.append(_fix_open_tool("task_manager", "📋 Apri Gestione attività",
+                                     "Apre il Task Manager per osservare i processi in tempo reale."))
+    return suggestions, fixes
+
+
+def advise_disk_speed_test(result: CheckResult) -> Tuple[List[Suggestion], List[FixAction]]:
+    suggestions, fixes = [], []
+    if result.status in PROBLEM_STATUSES:
+        write_speed = result.raw.get("write_speed", 0)
+        suggestions.append(Suggestion(
+            "🛒", "Il disco è probabilmente il collo di bottiglia",
+            f"La velocità di scrittura misurata è di soli {write_speed:.0f} MB/s: è la causa più comune di "
+            "lentezza percepita (avvio lento, programmi che si aprono a rilento, sistema che sembra "
+            "'congelato' per qualche secondo). Sostituire il disco attuale con un SSD (o un NVMe se la "
+            "scheda madre lo supporta) è l'intervento con il maggior beneficio percepibile su un PC lento."))
+        if is_windows():
+            fixes.append(_fix_open_tool("disk_management", "💽 Apri Gestione disco",
+                                         "Apre la Gestione disco di Windows per vedere i dischi installati."))
+    return suggestions, fixes
+
+
+def advise_reliability_history(result: CheckResult) -> Tuple[List[Suggestion], List[FixAction]]:
+    suggestions, fixes = [], []
+    if result.status in PROBLEM_STATUSES:
+        suggestions.append(Suggestion(
+            "🩺", "Blocchi/crash frequenti: verifica driver e RAM",
+            "Windows ha registrato diversi eventi critici di recente. Le cause più comuni sono driver "
+            "datati o incompatibili (specialmente della scheda video), un modulo RAM difettoso, o "
+            "surriscaldamento. Controlla Gestione dispositivi per driver con problemi ed esegui, se "
+            "possibile, un test della memoria (Strumento di diagnostica memoria di Windows)."))
+        if is_windows():
+            fixes.append(_fix_open_tool("device_manager", "🖧 Apri Gestione dispositivi",
+                                         "Verifica la presenza di driver con problemi (icona di avviso gialla)."))
+    return suggestions, fixes
+
+
 ADVISORS: Dict[str, AdvisorFunc] = {
     "ram": advise_ram,
     "ram_pressure": advise_ram_pressure,
@@ -313,6 +357,9 @@ ADVISORS: Dict[str, AdvisorFunc] = {
     "pending_reboot": advise_pending_reboot,
     "network_connectivity": advise_network_connectivity,
     "drivers": advise_drivers,
+    "performance_monitor": advise_performance_monitor,
+    "disk_speed_test": advise_disk_speed_test,
+    "reliability_history": advise_reliability_history,
 }
 
 

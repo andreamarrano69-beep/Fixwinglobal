@@ -11,10 +11,56 @@ from .models import CheckResult, Status
 from .utils import format_seconds, is_linux, is_mac, is_windows, run_command, run_powershell, sample_processes
 
 
+def _system_identity_lines() -> list:
+    """Identità precisa della macchina: produttore, modello, numero di serie, edizione Windows esatta."""
+    if not is_windows():
+        return []
+    script = (
+        "$os = Get-CimInstance Win32_OperatingSystem; "
+        "$cs = Get-CimInstance Win32_ComputerSystem; "
+        "$bios = Get-CimInstance Win32_BIOS; "
+        "Write-Output \"OS_CAPTION:$($os.Caption)\"; "
+        "Write-Output \"OS_BUILD:$($os.BuildNumber)\"; "
+        "Write-Output \"OS_ARCH:$($os.OSArchitecture)\"; "
+        "Write-Output \"SYS_MAKER:$($cs.Manufacturer)\"; "
+        "Write-Output \"SYS_MODEL:$($cs.Model)\"; "
+        "Write-Output \"SYS_SERIAL:$($bios.SerialNumber)\""
+    )
+    out = run_powershell(script, timeout=10)
+    if not out:
+        return []
+    values = {}
+    for line in out.splitlines():
+        if ":" in line:
+            key, _, val = line.strip().partition(":")
+            values[key] = val.strip()
+
+    lines = []
+    maker = values.get("SYS_MAKER", "").strip()
+    model = values.get("SYS_MODEL", "").strip()
+    if maker or model:
+        lines.append(f"Produttore / Modello: {maker or 'sconosciuto'} {model}".strip())
+    serial = values.get("SYS_SERIAL", "").strip()
+    if serial and serial.lower() not in ("", "none", "default string", "to be filled by o.e.m."):
+        lines.append(f"Numero di serie: {serial}")
+    caption = values.get("OS_CAPTION", "").strip()
+    build = values.get("OS_BUILD", "").strip()
+    arch = values.get("OS_ARCH", "").strip()
+    if caption:
+        edition_line = f"Edizione: {caption}"
+        if build:
+            edition_line += f" (build {build})"
+        if arch:
+            edition_line += f" — {arch}"
+        lines.append(edition_line)
+    return lines
+
+
 def check_os_info() -> CheckResult:
     boot_time = psutil.boot_time()
     uptime = time.time() - boot_time
-    details = [
+    details = _system_identity_lines()
+    details += [
         f"Sistema: {platform.system()} {platform.release()}",
         f"Versione: {platform.version()}",
         f"Architettura: {platform.machine()}",

@@ -23,6 +23,8 @@ CHECK_FUNCTIONS: Dict[str, Callable[[], CheckResult]] = {
     "battery": hw.check_battery,
     "temperature": hw.check_temperature,
     "usb": hw.check_usb,
+    "performance_monitor": hw.check_performance_monitor,
+    "disk_speed_test": hw.check_disk_speed_test,
     # Software
     "os_info": sw.check_os_info,
     "windows_update": sw.check_windows_update,
@@ -43,6 +45,7 @@ CHECK_FUNCTIONS: Dict[str, Callable[[], CheckResult]] = {
     "pending_reboot": pb.check_pending_reboot,
     "disk_fragmentation": pb.check_disk_fragmentation,
     "network_connectivity": pb.check_network_connectivity,
+    "reliability_history": pb.check_reliability_history,
 }
 
 
