@@ -27,6 +27,10 @@ CATEGORIES: List[Category] = [
             CheckMeta("disk_speed_test", "Test velocità disco (scrive/legge un file da 100 MB)",
                       "Misura la velocità reale di scrittura/lettura del disco per capire se è il collo di "
                       "bottiglia delle prestazioni (non solo quanto spazio è occupato)", default_selected=False),
+            CheckMeta("input_devices", "Tastiera e mouse",
+                      "Rileva tastiera e mouse collegati e segnala eventuali errori di driver riportati da Windows"),
+            CheckMeta("output_devices", "Monitor e audio (output)",
+                      "Rileva monitor e dispositivi audio collegati e segnala eventuali errori di driver"),
         ],
     ),
     Category(

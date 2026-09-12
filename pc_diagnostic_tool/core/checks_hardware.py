@@ -480,3 +480,124 @@ def check_disk_speed_test() -> CheckResult:
 
     return CheckResult("disk_speed_test", "Test velocità disco", status, summary, details,
                         raw={"write_speed": write_speed, "read_speed": read_speed})
+
+
+def check_input_devices() -> CheckResult:
+    """Verifica tastiera e mouse: rilevamento e codici di errore driver riportati da Windows."""
+    if is_linux():
+        try:
+            with open("/proc/bus/input/devices", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+            names = re.findall(r'N: Name="([^"]+)"', content)
+            relevant = [n for n in names if re.search(r"keyboard|mouse|touchpad", n, re.IGNORECASE)] or names
+            if names:
+                return CheckResult("input_devices", "Tastiera e mouse", Status.OK,
+                                    f"{len(names)} dispositivo/i di input rilevato/i", relevant)
+        except OSError:
+            pass
+        return CheckResult("input_devices", "Tastiera e mouse", Status.INFO,
+                            "Impossibile enumerare tastiera/mouse su questo sistema", [])
+
+    if not is_windows():
+        return CheckResult("input_devices", "Tastiera e mouse", Status.INFO,
+                            "Controllo dettagliato disponibile solo su Windows e Linux", [])
+
+    script = (
+        "$devs = @(); "
+        "$devs += Get-CimInstance Win32_Keyboard -ErrorAction SilentlyContinue; "
+        "$devs += Get-CimInstance Win32_PointingDevice -ErrorAction SilentlyContinue; "
+        "foreach ($d in $devs) { Write-Output \"DEV:$($d.Name)|$($d.Status)|$($d.ConfigManagerErrorCode)\" }"
+    )
+    out = run_powershell(script, timeout=10)
+    if not out or not out.strip():
+        return CheckResult("input_devices", "Tastiera e mouse", Status.INFO,
+                            "Impossibile enumerare tastiera/mouse (permessi insufficienti)", [])
+
+    details = []
+    problem_devices = []
+    count = 0
+    for line in out.splitlines():
+        line = line.strip()
+        if not line.startswith("DEV:"):
+            continue
+        count += 1
+        parts = line[4:].split("|")
+        name = parts[0].strip() if parts and parts[0].strip() else "Dispositivo sconosciuto"
+        dev_status = parts[1].strip() if len(parts) > 1 else ""
+        error_code = parts[2].strip() if len(parts) > 2 else "0"
+        line_out = f"{name}: stato {dev_status or 'sconosciuto'}"
+        if error_code and error_code != "0":
+            line_out += f" — codice errore Windows: {error_code} (dispositivo con problemi)"
+            problem_devices.append(name)
+        details.append(line_out)
+
+    if problem_devices:
+        status = Status.WARNING
+        summary = f"{len(problem_devices)} dispositivo/i di input con errori segnalati da Windows"
+    elif count == 0:
+        status = Status.WARNING
+        summary = "Nessuna tastiera o mouse rilevato tramite Windows (possibile problema di driver/connessione)"
+    else:
+        status = Status.OK
+        summary = f"{count} dispositivo/i di input rilevato/i, nessun errore segnalato"
+    return CheckResult("input_devices", "Tastiera e mouse", status, summary, details,
+                        raw={"problem_count": len(problem_devices)})
+
+
+def check_output_devices() -> CheckResult:
+    """Verifica monitor e dispositivi audio (uscita): rilevamento e codici di errore driver."""
+    if not is_windows():
+        return CheckResult("output_devices", "Monitor e audio (output)", Status.INFO,
+                            "Controllo dettagliato disponibile solo su Windows", [])
+
+    script = (
+        "$mons = Get-CimInstance Win32_DesktopMonitor -ErrorAction SilentlyContinue; "
+        "$auds = Get-CimInstance Win32_SoundDevice -ErrorAction SilentlyContinue; "
+        "foreach ($m in $mons) { Write-Output \"MON:$($m.Name)|$($m.Status)|$($m.ScreenWidth)x$($m.ScreenHeight)\" }; "
+        "foreach ($a in $auds) { Write-Output \"AUD:$($a.Name)|$($a.Status)|$($a.ConfigManagerErrorCode)\" }"
+    )
+    out = run_powershell(script, timeout=10)
+    if not out or not out.strip():
+        return CheckResult("output_devices", "Monitor e audio (output)", Status.INFO,
+                            "Impossibile enumerare monitor/dispositivi audio (permessi insufficienti)", [])
+
+    details = []
+    problems = []
+    mon_count = aud_count = 0
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith("MON:"):
+            mon_count += 1
+            parts = line[4:].split("|")
+            name = parts[0].strip() or "Monitor"
+            mon_status = parts[1].strip() if len(parts) > 1 else ""
+            resolution = parts[2].strip() if len(parts) > 2 else ""
+            line_out = f"Monitor: {name} — stato {mon_status or 'sconosciuto'}"
+            if resolution and resolution not in ("0x0", "x"):
+                line_out += f", risoluzione {resolution}"
+            details.append(line_out)
+            if mon_status and mon_status.lower() not in ("ok", ""):
+                problems.append(name)
+        elif line.startswith("AUD:"):
+            aud_count += 1
+            parts = line[4:].split("|")
+            name = parts[0].strip() or "Dispositivo audio"
+            aud_status = parts[1].strip() if len(parts) > 1 else ""
+            error_code = parts[2].strip() if len(parts) > 2 else "0"
+            line_out = f"Audio: {name} — stato {aud_status or 'sconosciuto'}"
+            if error_code and error_code != "0":
+                line_out += f" — codice errore Windows: {error_code}"
+                problems.append(name)
+            details.append(line_out)
+
+    if problems:
+        status = Status.WARNING
+        summary = f"{len(problems)} dispositivo/i di output con problemi rilevati"
+    elif mon_count == 0 and aud_count == 0:
+        status = Status.INFO
+        summary = "Nessun monitor/dispositivo audio rilevato tramite Windows"
+    else:
+        status = Status.OK
+        summary = f"{mon_count} monitor e {aud_count} dispositivo/i audio rilevati, nessun problema segnalato"
+    return CheckResult("output_devices", "Monitor e audio (output)", status, summary, details,
+                        raw={"problem_count": len(problems)})

@@ -336,6 +336,49 @@ def advise_reliability_history(result: CheckResult) -> Tuple[List[Suggestion], L
     return suggestions, fixes
 
 
+def advise_input_devices(result: CheckResult) -> Tuple[List[Suggestion], List[FixAction]]:
+    suggestions, fixes = [], []
+    if result.status in PROBLEM_STATUSES:
+        suggestions.append(Suggestion(
+            "⌨", "Verifica connessione fisica e driver",
+            "Se tastiera o mouse risultano con un errore, prova prima a scollegarli e ricollegarli (meglio "
+            "su una porta USB diversa), o a sostituire le pile se sono wireless. Se il problema persiste "
+            "dopo un riavvio, il driver potrebbe essere corrotto e va reinstallato."))
+        if is_windows():
+            fixes.append(_fix_open_tool("device_manager", "🖧 Apri Gestione dispositivi",
+                                         "Individua il dispositivo con l'icona di avviso gialla: da lì puoi "
+                                         "disinstallarlo e farlo reinstallare da Windows al riavvio."))
+            fixes.append(FixAction(
+                id="rescan_hardware", label="🔄 Nuova ricerca hardware", risk="safe",
+                description="Chiede a Windows di ricercare nuovamente tutte le periferiche collegate "
+                            "(comando nativo 'pnputil /scan-devices'). Sicuro, non modifica nulla in modo "
+                            "permanente, utile se un dispositivo non viene riconosciuto correttamente.",
+                run=fx.rescan_hardware,
+            ))
+    return suggestions, fixes
+
+
+def advise_output_devices(result: CheckResult) -> Tuple[List[Suggestion], List[FixAction]]:
+    suggestions, fixes = [], []
+    if result.status in PROBLEM_STATUSES:
+        suggestions.append(Suggestion(
+            "🖥", "Verifica cavo video/audio e driver",
+            "Per un monitor: controlla il cavo video (HDMI/DisplayPort) e prova una porta diversa sulla "
+            "scheda video. Per l'audio: verifica che il dispositivo giusto sia impostato come predefinito "
+            "nelle impostazioni audio. Se il problema persiste, il driver video o audio va aggiornato o "
+            "reinstallato."))
+        if is_windows():
+            fixes.append(FixAction(
+                id="audio_troubleshooter", label="🔊 Risoluzione problemi audio", risk="safe",
+                description="Avvia lo strumento di risoluzione problemi audio integrato in Windows: "
+                            "rileva e propone correzioni automatiche per i problemi più comuni.",
+                run=fx.run_audio_troubleshooter,
+            ))
+            fixes.append(_fix_open_tool("device_manager", "🖧 Apri Gestione dispositivi",
+                                         "Verifica driver video/audio con problemi (icona di avviso gialla)."))
+    return suggestions, fixes
+
+
 ADVISORS: Dict[str, AdvisorFunc] = {
     "ram": advise_ram,
     "ram_pressure": advise_ram_pressure,
@@ -360,6 +403,8 @@ ADVISORS: Dict[str, AdvisorFunc] = {
     "performance_monitor": advise_performance_monitor,
     "disk_speed_test": advise_disk_speed_test,
     "reliability_history": advise_reliability_history,
+    "input_devices": advise_input_devices,
+    "output_devices": advise_output_devices,
 }
 
 

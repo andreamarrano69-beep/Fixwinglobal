@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import tempfile
 import time
 
@@ -122,3 +123,25 @@ def open_system_tool(tool: str) -> FixOutcome:
         return FixOutcome(True, "Strumento di sistema aperto: completa l'operazione dalla finestra che si è aperta.")
     except OSError as exc:
         return FixOutcome(False, f"Impossibile aprire lo strumento richiesto: {exc}")
+
+
+def rescan_hardware() -> FixOutcome:
+    """Chiede a Windows di ricercare nuovamente tutte le periferiche collegate (nuovo rilevamento hardware)."""
+    if not is_windows():
+        return FixOutcome(False, "Operazione disponibile solo su Windows.")
+    out = run_command(["pnputil", "/scan-devices"], timeout=30)
+    if out is None:
+        return FixOutcome(False, "Impossibile eseguire la nuova ricerca hardware (potrebbero servire permessi "
+                                  "di amministratore).")
+    return FixOutcome(True, "Nuova ricerca hardware completata: Windows ha ridetectato le periferiche collegate.")
+
+
+def run_audio_troubleshooter() -> FixOutcome:
+    """Avvia lo strumento di risoluzione problemi audio integrato in Windows."""
+    if not is_windows():
+        return FixOutcome(False, "Operazione disponibile solo su Windows.")
+    try:
+        subprocess.Popen(["msdt.exe", "/id", "AudioPlaybackDiagnostic"])
+        return FixOutcome(True, "Risoluzione problemi audio di Windows avviata: segui le indicazioni a schermo.")
+    except OSError as exc:
+        return FixOutcome(False, f"Impossibile avviare la risoluzione problemi audio: {exc}")

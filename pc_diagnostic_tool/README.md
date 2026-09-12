@@ -7,8 +7,8 @@ selezionabili singolarmente.
 ## Funzionalità
 
 - **Dashboard** con punteggio di salute (0-100), card riepilogative e avvio rapido.
-- **Selezione controlli**: 31 verifiche suddivise in 3 categorie, ognuna attivabile/disattivabile:
-  - **Hardware**: CPU, RAM (con conteggio slot occupati/liberi), dischi, salute SMART (tipo SSD/HDD), GPU, scheda madre/BIOS, rete, batteria, temperature, USB, **monitoraggio prestazioni** (campiona CPU/RAM/disco per ~8 secondi per scovare picchi intermittenti), **test velocità disco reale** (scrive/legge un file da 100 MB).
+- **Selezione controlli**: 33 verifiche suddivise in 3 categorie, ognuna attivabile/disattivabile:
+  - **Hardware**: CPU, RAM (con conteggio slot occupati/liberi), dischi, salute SMART (tipo SSD/HDD), GPU, scheda madre/BIOS, rete, batteria, temperature, USB, **tastiera e mouse** (input, con errori driver), **monitor e audio** (output, con errori driver), **monitoraggio prestazioni** (campiona CPU/RAM/disco per ~8 secondi per scovare picchi intermittenti), **test velocità disco reale** (scrive/legge un file da 100 MB).
   - **Software**: sistema operativo (produttore, modello, numero di serie, edizione Windows esatta), aggiornamenti, software installato, programmi all'avvio, processi, antivirus, driver, servizi.
   - **Problemi potenziali**: spazio disco, sovraccarico CPU, memoria insufficiente, surriscaldamento, batteria degradata, errori di sistema, processi sospetti, riavvio in sospeso, frammentazione, connettività, **cronologia affidabilità di Windows** (crash/blocchi registrati dal sistema).
 - **Risultati** in un elenco ad albero colorato per gravità (OK / Attenzione / Critico / Non disponibile), con pannello dettagli a due schede:
