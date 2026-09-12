@@ -27,6 +27,7 @@ CHECK_FUNCTIONS: Dict[str, Callable[[], CheckResult]] = {
     "disk_speed_test": hw.check_disk_speed_test,
     "input_devices": hw.check_input_devices,
     "output_devices": hw.check_output_devices,
+    "stuck_keys_test": hw.check_stuck_keys,
     # Software
     "os_info": sw.check_os_info,
     "windows_update": sw.check_windows_update,

@@ -29,6 +29,9 @@ CATEGORIES: List[Category] = [
                       "bottiglia delle prestazioni (non solo quanto spazio è occupato)", default_selected=False),
             CheckMeta("input_devices", "Tastiera e mouse",
                       "Rileva tastiera e mouse collegati e segnala eventuali errori di driver riportati da Windows"),
+            CheckMeta("stuck_keys_test", "Test tasti bloccati (~3 sec, non toccare la tastiera)",
+                      "Rileva se un tasto risulta fisicamente incastrato/premuto in modo anomalo "
+                      "(es. il classico 'Canc bloccato' che causa eliminazioni continue)"),
             CheckMeta("output_devices", "Monitor e audio (output)",
                       "Rileva monitor e dispositivi audio collegati e segnala eventuali errori di driver"),
         ],

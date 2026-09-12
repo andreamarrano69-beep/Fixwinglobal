@@ -601,3 +601,55 @@ def check_output_devices() -> CheckResult:
         summary = f"{mon_count} monitor e {aud_count} dispositivo/i audio rilevati, nessun problema segnalato"
     return CheckResult("output_devices", "Monitor e audio (output)", status, summary, details,
                         raw={"problem_count": len(problems)})
+
+
+def check_stuck_keys() -> CheckResult:
+    """Test fisico (non solo driver): rileva se un tasto risulta premuto in modo anomalo per tutta la
+    durata del test — il sintomo tipico di un tasto meccanicamente incastrato (es. Canc bloccato che
+    continua a inviare comandi di eliminazione)."""
+    if not is_windows():
+        return CheckResult("stuck_keys_test", "Test tasti bloccati", Status.UNSUPPORTED,
+                            "Disponibile solo su Windows", [])
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+    except (AttributeError, OSError):
+        return CheckResult("stuck_keys_test", "Test tasti bloccati", Status.ERROR,
+                            "Impossibile accedere alle API di Windows per questo test", [])
+
+    keys = {
+        0x08: "Backspace", 0x09: "Tab", 0x0D: "Invio", 0x10: "Shift", 0x11: "Ctrl", 0x12: "Alt",
+        0x1B: "Esc", 0x20: "Spazio", 0x2E: "Canc (Delete)", 0x2D: "Ins", 0x24: "Home", 0x23: "Fine",
+        0x21: "Pag Su", 0x22: "Pag Giù",
+        0x25: "Freccia sinistra", 0x26: "Freccia su", 0x27: "Freccia destra", 0x28: "Freccia giù",
+        0x70: "F1", 0x71: "F2", 0x72: "F3", 0x73: "F4", 0x74: "F5", 0x75: "F6",
+        0x76: "F7", 0x77: "F8", 0x78: "F9", 0x79: "F10", 0x7A: "F11", 0x7B: "F12",
+    }
+    for code in range(0x30, 0x3A):
+        keys[code] = chr(code)
+    for code in range(0x41, 0x5B):
+        keys[code] = chr(code)
+
+    samples = 6
+    interval = 0.5
+    pressed_counts = {code: 0 for code in keys}
+    for _ in range(samples):
+        for code in keys:
+            state = user32.GetAsyncKeyState(code)
+            if state & 0x8000:
+                pressed_counts[code] += 1
+        time.sleep(interval)
+
+    stuck = [keys[code] for code, count in pressed_counts.items() if count == samples]
+
+    details = [f"Durata test: {samples * interval:.1f} secondi ({len(keys)} tasti monitorati; "
+               "non toccare la tastiera durante il test per un risultato affidabile)"]
+    if stuck:
+        details.append("Tasti risultati premuti per l'intera durata del test:")
+        details.extend(f"  {k}" for k in stuck)
+        return CheckResult("stuck_keys_test", "Test tasti bloccati", Status.CRITICAL,
+                            f"Rilevato/i {len(stuck)} tasto/i probabilmente bloccato/i: {', '.join(stuck)}",
+                            details, raw={"stuck_keys": stuck})
+    details.append("Nessun tasto risultato bloccato durante il test")
+    return CheckResult("stuck_keys_test", "Test tasti bloccati", Status.OK,
+                        "Nessun tasto bloccato rilevato", details)

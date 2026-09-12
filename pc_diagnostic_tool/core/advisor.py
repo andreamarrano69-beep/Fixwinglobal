@@ -358,6 +358,23 @@ def advise_input_devices(result: CheckResult) -> Tuple[List[Suggestion], List[Fi
     return suggestions, fixes
 
 
+def advise_stuck_keys_test(result: CheckResult) -> Tuple[List[Suggestion], List[FixAction]]:
+    suggestions, fixes = [], []
+    if result.status in PROBLEM_STATUSES:
+        stuck = result.raw.get("stuck_keys", [])
+        keys_txt = ", ".join(stuck) if stuck else "il tasto rilevato"
+        suggestions.append(Suggestion(
+            "🔧", "Problema meccanico, non software",
+            f"Il tasto {keys_txt} risulta bloccato fisicamente durante tutto il test: è un problema "
+            "meccanico della tastiera (sporco/liquido sotto il tasto, o un tasto rotto), non un problema "
+            "di Windows o di driver. Scollega subito la tastiera se il problema persiste: un tasto "
+            "bloccato può causare azioni indesiderate ripetute (es. eliminazioni continue di file se il "
+            "tasto bloccato è Canc). Se è una tastiera esterna, prova a pulirla capovolta con aria "
+            "compressa o valuta la sostituzione; se è quella integrata di un portatile, serve assistenza "
+            "hardware."))
+    return suggestions, fixes
+
+
 def advise_output_devices(result: CheckResult) -> Tuple[List[Suggestion], List[FixAction]]:
     suggestions, fixes = [], []
     if result.status in PROBLEM_STATUSES:
@@ -405,6 +422,7 @@ ADVISORS: Dict[str, AdvisorFunc] = {
     "reliability_history": advise_reliability_history,
     "input_devices": advise_input_devices,
     "output_devices": advise_output_devices,
+    "stuck_keys_test": advise_stuck_keys_test,
 }
 
 
